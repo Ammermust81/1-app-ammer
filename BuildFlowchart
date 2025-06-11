@@ -1,0 +1,172 @@
+    final Runnable buildThread = () ->
+    { if(howMany==1)
+        buildSudoku();
+      else
+      { multiBuild();
+        if(sixpack)
+        { Sixpack.trigger();
+          jfSudoku.dispose();
+          Def.building = Def.STATE_IDLE;
+          return;
+        }
+      }
+      buildMenuItem.setText("Start Building");
+      if(Def.building == Def.STATE_INTERRUPTED)
+      { Def.building = Def.STATE_IDLE;
+        Methods.interrupted(jfSudoku);
+        makeGrid();
+        restoreFrame();
+        return;
+      }
+      Methods.havePuzzle = true;
+      restoreFrame();
+      Methods.puzzleSaved(jfSudoku,  "sudoku", Op.su[Op.SU.SuPuz.ordinal()]);
+      Def.building = Def.STATE_IDLE;
+    };
+_______________________________________________________________________________________________________________________________
+
+  private void multiBuild()
+  { String title = Methods.puzzleTitle;                                             //--save current title
+    int diffDef[] = {2, 3, 4, 5, 6, 12, 13};                                        //--seven difficulty levels
+    int saveDiff = Op.getInt(Op.SU.SuDifficulty.ordinal(), Op.su);                  //--save current difficulty
+
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");                        //--prepare calendar
+    Calendar c = Calendar.getInstance();
+
+    for(hmCount=1; hmCount<=howMany; hmCount++)                                     //--establish a build loop
+    { try { c.setTime(sdf.parse("" + startPuz)); }                                  //--correct invalid date formats
+      catch(ParseException ex) {}
+      startPuz=Integer.parseInt(sdf.format(c.getTime()));
+
+      Methods.puzzleTitle = "SUDOKU Puzzle : "+ startPuz;                           //--derive the puzzle title
+      if(Op.getBool(Op.SX.VaryDiff.ordinal(), Op.sx))                               //--if variable difficulty required
+        Op.setInt(Op.SU.SuDifficulty.ordinal(), diffDef[(startPuz-1)%7], Op.su);    //--set the difficulty
+
+      Methods.buildProgress(jfSudoku,
+        Op.su[Op.SU.SuPuz.ordinal()] = ""+startPuz +".sudoku");                     //--derive the puzzle name and show progress
+      buildSudoku();                                                                //--build the puzzle
+      restoreFrame();                                                               //--display it
+      Wait.shortWait(100);                                                          //--wait while it is displayed
+      if(Def.building == Def.STATE_INTERRUPTED)                                     //--if interrupt is requested
+        return;                                                                     //--cease building
+      startPuz++;                                                                   //--step to next puzzle
+    }
+    howMany = 1;
+    Methods.puzzleTitle = title;                                                    //--restore previous puzzle title
+    Op.setInt(Op.SU.SuDifficulty.ordinal(), saveDiff, Op.su);                       //--restore difficulty
+  }
+_______________________________________________________________________________________________________________________________
+
+private static void buildSudoku()
+{ int x, y, loop;
+
+  for(loop=0; ; loop++)
+  { for(y=0; y<9; y++)                                                            //--clear the grid
+      for(x=0; x<9; x++)
+        Grid.grid[x][y] = 0;
+    recalculateStatus();
+    fillSudokuAt(0);
+
+    for(y=0; y<9; y++)                                                            //--take a copy of grid
+      for(x=0; x<9; x++)
+        Grid.puz[x][y] = Grid.sol[x][y] = Grid.grid[x][y];
+    if(depopulateSudoku())
+      break;
+    if(Def.building == Def.STATE_INTERRUPTED)                                     //--if interrupt is requested
+      return;                                                                     //--cease building
+
+    if(howMany == 1 && loop%100 == 0)                                             //--if not multiBuilding and time to dispalay
+    { restoreFrame();                                                             //--display the puzzle
+      Methods.buildProgress(jfSudoku, Op.su[Op.SU.SuPuz.ordinal()]);              //--derive the puzzle name and show progress
+    }
+  }
+  saveSudoku(Op.su[Op.SU.SuPuz.ordinal()]);
+  undoIndex = 0;
+}
+_______________________________________________________________________________________________________________________________
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+BUILD THREAD
+
+    Runnable buildThread
+    { If only 1 puzzle required
+        Build it (and save it
+      else
+      { Do the multi build
+        If sixpack being built
+        { Call the Sixpack trigger
+          Dispose of puzzle window
+          Return to idle state
+          Exit build thread
+        }
+      }
+      buildMenuItem.setText("Start Building")                                   rename the build menu item
+      if interrupt requested
+      { Def.building = Def.STATE_IDLE                                           return to idle state
+        Methods.interrupted(jfPuzzle)                                           report the interruption
+        makeGrid()                                                              clear grids
+        restoreFrame()                                                          display puzzle window
+        return                                                                  exit build function after interruption
+      }
+      Flag that a puzzle is available
+      Display puzzle window
+      Report a successful build
+      Return to idle state
+    }
+___________________________________________________________________________________________________________________________
+SIMPLE BUILD
+
+  Establish a build loop
+  { Complete the steps to build the puzzle
+    If completed successfully
+      break
+    if interrupt requested
+      return;
+
+    If not multiBuilding and time to dispalay
+    { Display the puzzle
+      Derive the puzzle name and show progress
+    }
+  }
+  Save the completed puzzle
+  Reset undoIndex
+___________________________________________________________________________________________________________________________
+MULTI BUILD
+
+  private void multiBuild()
+  { Save environment variables
+    Prepare a calendar
+
+    Establish a build loop
+    { Correct invalid date formats
+      Derive this puzzle title
+      If variable difficulty required
+        Set the difficulty
+      Derive the puzzle name and show progress
+      Build the puzzle
+      Display it
+      Wait while it is displayed
+      If interrupt is requested
+        return
+      Step to next puzzle
+    }
+    howMany = 1;
+    Restore environment variables
+  }

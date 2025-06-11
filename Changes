@@ -1,0 +1,53 @@
+------Build call solve
+      menuItem = new JMenuItem("Solve this Puzzle");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_V,
+                              Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( (ActionEvent ae) ->
+        { if(Def.building == Def.STATE_BUILDING) return;
+          if(Methods.havePuzzle)
+          { jfFillomino.setState(Frame.ICONIFIED);
+            new FillominoSolve(jfFillomino);
+          }
+          else
+            Methods.noPuzzle(jfFillomino, "Solve");
+        }
+      );
+
+------Build MouseMotionListener
+    pp.addMouseMotionListener
+    ( new MouseAdapter()
+      { @Override public void mouseMoved(MouseEvent e)
+        { jfFillomino.setResizable((jfFillomino.getWidth() - e.getX() < 15) &&
+         (jfFillomino.getHeight() - e.getY() < 95));
+        }
+      }
+    );
+
+------Solve closing
+    jfSolveFillomino.addWindowListener
+    ( new WindowAdapter()
+      { @Override public void windowClosing(WindowEvent we)
+        { if(Def.selecting) return;
+          Op.saveOptions("fillomino.opt", Op.fi);
+          restoreIfDone();
+          saveFillomino(Op.fi[Op.FI.FiPuz.ordinal()]);
+          jfSolveFillomino.dispose();
+          Methods.closeHelp();
+          Def.puzzleMode = memMode;
+          FillominoBuild.jfFillomino.setState(Frame.NORMAL);
+        }
+      }
+    );
+    Methods.closeHelp();
+
+------Solve MouseMotionListener
+    pp.addMouseMotionListener
+    ( new MouseAdapter()
+      { @Override public void mouseMoved(MouseEvent e)
+        { jfSolveFillomino.setResizable((jfSolveFillomino.getWidth() - e.getX() < 15) &&
+         (jfSolveFillomino.getHeight() - e.getY() < 95));
+        }
+      }
+    );

@@ -1,0 +1,2017 @@
+package crosswordexpress;
+
+import java.io.*;
+import java.awt.*;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.UnsupportedFlavorException;
+import java.util.*;
+import javax.swing.*;
+import java.awt.event.*;
+import java.nio.ByteBuffer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.swing.filechooser.FileNameExtensionFilter;
+
+public final class DevanagariBuild implements ActionListener
+{
+  static JFrame   jfDevanagari;
+  static JMenuBar menuBar;
+  JMenu           menu, submenu;
+  JMenuItem       menuItem, buildMenuItem;
+  static JPanel   pp;
+  static int      panelW, panelH;
+  static JLabel   jl1, jl2;
+  int             thisColor=0x00DDDD;
+  Thread          thread;
+  File[]          grids;
+
+  //--dictionary storage variables
+  static int      wordCount[]=new int[50];
+  static int      chInt[][][]=new int[50][][];
+  static int      revLink[][]=new int[50][];
+  static boolean  busy[][]=new boolean[50][];
+
+  static byte     dNull=0, dLetter=1, dSign=2;
+
+  static String addCluesHelp =
+    "<ul>"+
+      "<li/>If you have been using a dictionary having clues associated with the words to build your puzzle, then most of the "+
+      "words will already be provided with clues.<p/>"+
+      "<li/>Selecting a word in the puzzle (by using the arrow keys or by clicking with the mouse) and clicking the <b>Add "+
+      "Clue</b> button will display the clue, if one exists.<p/>"+
+      "<li/>If no clue exists for the word, then you can use the <b>Clue</b> edit box to type in a suitable clue.<p/>"+
+      "<li/>Three buttons are provided to assist people who like to compose cryptic clues or similar for use in their "+
+      "puzzles:-"+
+      "<ul>"+
+        "<li/><span>Container Words</span> A list of all of the single words which contain all of the letters of the subject word will be displayed.<p/>"+
+        "<li/><span>Contained Words</span> A list of all of the single words which can be made from the letters contained "+
+        "within the subject word will be displayed.<p/>"+
+        "<li/><span>Anagrams</span> This button will display a list of all possible <b>Anagrams</b> of the word. These may be "+
+        "single words or they may be lists of two, three or even more words, depending on the length of the subject Word.<br/><br/>"+
+      "</ul>"+
+      "<li/>The behaviour of the <b>Anagram</b> and <b>Contained Words</b> functions can be modified by selecting a number from the "+
+      "<b>Shortest Word</b> combo box. The length of the words which appear in the list for these two functions will be limited to "+
+      "the value that you specify here.<p/>"+
+      "<li/>When you click the <b>OK</b> button, the contents of the <b>Clue</b> edit box will be attached to the puzzle, but "+
+      "if you click the <b>Cancel</b> button, any changes you may have made to the clue will be abandoned."+
+    "</ul></body>";
+
+  String devanagariOptionsHelp =
+    "<div>A number of options described in the following are available to you before you begin to construct a crossword "+
+      "puzzle:-<br/><br/></div>"+
+    "<ul>"+
+      "<li/>If you want to make a number of puzzles all having the same dimensions, simply type a number into the <b>How many "+
+      "puzzles</b> input field. When you issue the Make command, Crossword Express will make that number of puzzles. The "+
+      "puzzle names will be numbers which represent a date in <b>yyyymmdd</b> format. The default value presented by "+
+      "Crossword Express is always the current date, but you can change this to any date that suits your needs. As the series "+
+      "of puzzles is created, CWE will automatically step on to the next date in the sequence, taking into account such "+
+      "factors as the varying number of days in the months, and of course leap years. Virtually any number of puzzles can be "+
+      "made in a single operation using this feature.<p/>"+
+      "<li/>When you use the Multi-Make function described above, you have the option of locking out the words used in a puzzle so that they won't "+
+      "be used in subsequent puzzles. If you set the <b>Use Automatic Lockout &amp; Unlock</b> check box, then each time a puzzle is built, the "+
+      "words used in it will be locked out of the dictionary. If you have made more than 100 puzzles, then the words used in the puzzle numbered 100 "+
+      "less than the current one will be unlocked, and placed back into operation. Note that this mechanism applies only if you are using the "+
+      "Multi-Make feature.<p/>"+
+      "<li/>There are two steps which must be taken if a <b>Theme</b> puzzle is to be built:-"+
+      "<ul>"+
+        "<li/>Select the <b>Build a Theme Puzzle</b> check box<p/>"+
+        "<li/>Select the theme dictionaries to be used for this puzzle. A maximum of four such dictionaries can be selected. If you want to use less "+
+        "than this maximum number simply select the <b>&lt;None&gt;</b> option for one or more of the theme dictionaries. When the puzzle is "+
+        "built, the theme dictionaries will be searched in order for a suitable word. If a suitable word cannot be found in any of the theme "+
+        "dictionaries, one will be taken from the standard dictionary selected within the Crossword Construction screen.<p/>"+
+      "</ul>" +
+      "<li/>When you build a puzzle, the normal mode of operation is for the program to use only those words which have not been withdrawn from "+
+      "service by the word Lockout function. You can change this behaviour by checking the <b>Use all words (including locked words)</b> check-box. "+
+      "This will result in all of the words within the dictionary being used to build the puzzle, and if a word has more than one clue then one of "+
+      "these clues will be randomly selected for use in the puzzle."+
+    "</ul></body>";
+
+  String crosswordHelp =
+    "<span class='m'>Menu Functions</span><br/><br/>"+
+    "<ul>"+
+      "<li><span class='s'>File Menu</span>"+
+      "<ul>"+
+        "<li><span>Select a Dictionary</span><br/>"+
+          "When loading a new puzzle into the Build screen, you begin by selecting the dictionary which was used to build the "+
+          "CROSSWORD puzzle which you want to load.<p/>"+
+        "<li><span>Load a Puzzle</span><br/>"+
+          "Then you choose your puzzle from the pool of CROSSWORD puzzles currently available in the selected dictionary.<p/>"+
+        "<li><span>Save</span><br/>"+
+          "If you have done some manual editing of the puzzle, this option will save those changes under the existing file name. Note that this option "+
+          "will only be effective if the puzzle has already been saved on a previous occasion using the SaveAs option. For subsequent Saves as you "+
+          "continue your manual construction it will function as expected.<p/>"+
+        "<li><span>SaveAs</span><br/>"+
+          "This option allows you to make an exact copy of the current puzzle using a different file name. The copy will be saved in the folder of the "+
+          "dictionary that was used to construct it. Alternatively, if you don't enter a new name for the puzzle, you can change the Puzzle "+
+          "Description, or any of the other descriptive items without changing the puzzle name.<p/>"+
+        "<li><span>Quit Construction</span><br/>"+
+          "Returns you to the Crossword Express opening screen."+
+      "</ul>"+
+      "<li><span class='s'>Build Menu</span>"+
+      "<ul>"+
+        "<li><span>Construction Wizard</span><br/>"+
+          "The Wizard is intended for people who are new to Crossword Express. It guides you, step by step, through the "+
+          "individual processes involved in the construction of a new puzzle. Experienced users will soon realize that some "+
+          "of the steps are not always required (selecting a dictionary for example) and will prefer to use only those of the "+
+          "following options which are required for their particular circumstances.<p/>"+
+        "<li/><span >Start a New Puzzle</span><br/>"+
+          "This option presents you with a dialog into which you can enter a file name for your new puzzle. You can also "+
+          "enter several other pieces of optional information such as a <b>Puzzle Title, Author</b> and <b>Copyright</b> "+
+          "information.<p/>"+
+        "<li/><span>Select a Dictionary</span><br/>"+
+          "Use this option to select the dictionary which you want to use to build the new CROSSWORD puzzle.<p/>"+
+        "<li/><span>Select a Grid</span><br/>"+
+          "Crossword puzzles are built on a predefined grid, which you can select using this option. You can select a single "+
+          "grid for normal operation, or you can select a number of grids which will be useful if you are going to "+
+          "use the Multi-Make function described in the Help available from the Crossword Options dialog. As the multiple "+
+          "puzzles are constructed, the program will use a different grid for each puzzle by cycling through the grids you "+
+          "have selected. You can build an unlimited number of additional grids using functions available via the <b>GRID "+
+          "MAINTENANCE</b> button on the Crossword Express opening screen.<p/>"+
+        "<li/><span>Build Options</span><br/>"+
+          "Use this option to access a Build Options dialog where you can set some rules to be followed by the puzzle "+
+          "building function as it builds your puzzle.<p/>"+
+        "<li/><span>Start Building / Stop Building</span><br/> Construction of the puzzle will commence when you select the "+
+          "<b>Start Building</b> option. If puzzle building is successful you will receive a message containing the name of "+
+          "the puzzle file, and the location where it was saved. If it becomes necessary, you can interrupt the building "+
+          "process by selecting this option a second time. Note that during the construction phase, the text of this option "+
+          "is changed to <b>Stop Building</b>"+
+      "</ul>"+
+      "<li/><span class='s'>View Menu</span>"+
+      "<ul>"+
+        "<li/><span>Display Options</span><br/>"+
+          "This leads you to a dialog box in which you can change the colors of various elements within the puzzle, and control the fonts which will "+
+          "be used for the puzzle's text components. You can also decide if printing of the puzzle will be done in black and white or in color."+
+      "</ul>"+
+      "<li/><span class='s'>Print Menu</span><br/>"+
+      "<ul>"+
+        "<li/><span>Print Crossword</span><br/>"+
+          "The current puzzle can be printed as a standard CROSSWORD.<p/>"+
+        "<li/><span>Print French-Style Crossword</span><br/>"+
+          "The current puzzle can be printed in the French-Style preferred in some European countries. Note that in this case, the clues are printed "+
+          "in a single column which should probably extend to the same width as the puzzle itself. Among the Print Layouts available from the Print "+
+          "screen there is one called <b>frenchstyle</b> which you can use as is, or modify to suit your requirements.<p/>"+
+        "<li/><span>Print Codeword</span><br/>"+
+          "The current puzzle can be printed as a CODEWORD puzzle.<p/>"+
+        "<li/><span>Print Fillin</span><br/>"+
+          "The current puzzle can be printed as a FILLIN puzzle.<p/>"+
+        "<li/><span>Print Arrowword</span><br/>"+
+          "The current puzzle can be printed in the ARROWWORD format.<p/>"+
+        "<li/><span>Print a Publication Submission</span><br/>"+
+          "Some Crossword Express users may wish to submit their puzzles to publishers for inclusion in newspapers and "+
+          "magazines. In many cases this will require that the puzzle be presented in a very particular format which "+
+          "unfortunately differs significantly between publishers. This option will print a Submission Document according "+
+          "to the specification provided by the <b>New York Times,</b> and if it proves to be popular, consideration will be "+
+          "given to creation of a series of options which cater for other major publications. If you have such a requirement "+
+          "by all means contact me via email with a detailed specification of the Submission Document required."+
+      "</ul>"+
+      "<li/><span class='s'>Solve Menu</span><br/>"+
+      "<ul>"+
+        "<li/><span>Solve as Crossword</span><br/>"+
+          "The current puzzle can be solved as a standard CROSSWORD.<p/>"+
+        "<li/><span>Solve as Crossword (Audience Mode)</span><br/>"+
+          "Similar to the normal Solve function, except that only a single clue is displayed at a time, and the puzzle is "+
+          "displayed in a large format. The intention is that the puzzle be displayed using a video projector or big screen "+
+          "digital TV connected by an HDMI cable to the computer running the Crossword Express program. This configuration "+
+          "has been found useful for the entertainment of residents of retirement homes.<p/>"+
+        "<li/><span>Solve as Codeword</span><br/>"+
+          "The current puzzle can be solved as a CODEWORD puzzle.<p/>"+
+        "<li/><span>Solve as Fillin</span><br/>"+
+          "The current puzzle can be solved as a FILLIN puzzle."+
+      "</ul>"+
+      "<li/><span class='s'>Export Menu</span><br/>"+
+      "<ul>"+
+        "<li/><span>Export Crossword Web-App</span><br/>"+
+          "This function allows you to export a Web Application Program which you can then upload to your own web site to "+
+          "provide a fully interactive crossword puzzle for the entertainment of visitors to your site. For a full "+
+          "description of the facilities provided by this Web-App, please refer to the Help available at <b>Help / Web "+
+          "Application</b> on the menu bar of the <b>Build Crossword</b> window of this program.<p/>"+
+        "<li/><span>Launch a Demo Web App</span><br/>"+
+          "Take a first look at the Crossword Web App. See what it could do to enhance your web site.<p/>"+
+        "<li/><span>Export Puzzle as Text</span><br/>"+
+          "Under normal circumstances, the Print function will provide all of the layout flexibility you will need when "+
+          "printing your puzzles. Inevitably of course special cases will arise where you need to intervene in the printing "+
+          "of either the words or the clues to achieve some special effect. To meet this need, a text export feature offers "+
+          "the following choices:-<p/>"+
+          "<ul>"+
+            "<li/><b>Export Words.</b> Each line of text has the format <b>Id. WORD</b>"+
+            "<li/><b>Export Clues.</b> Each line of text has the format <b>Id. Clue</b>"+
+            "<li/><b>Export Words and Clues.</b> Each line of text has the format <b>Id. WORD : Clue</b>"+
+            "<li/><b>Export Puzzle Grid.</b> The puzzle grid is exported as a simple square or rectangular array of letters."+
+          "</ul>"+
+          "In addition, you have the choice of exporting the text to a text file located anywhere on your computer's hard "+
+          "drive, or to the System Clipboard from where you can Paste into any Word Processor or Desk Top Publishing "+
+          "application."+
+      "</ul>"+
+      "<li/><span class='s'>Tasks Menu</span>"+
+      "<ul>"+
+        "<li/><span>Delete this Puzzle</span><br/>"+
+          "Use this option to eliminate unwanted CROSSWORD puzzles from your file system.<p/>"+
+        "<li/><span'>Lockout Words</span><br/>"+
+          "Use this option to condition the current dictionary so that the words used in this puzzle will not be used in "+
+          "subsequent puzzles.<p/>"+
+        "<li/><span>Transfer Puzzle Clues to Dictionary</span><br/>"+
+          "If you have used manual processing to partially or completely build the puzzle, it may be that the puzzle will "+
+          "contain some words and clues which do not yet appear in the dictionary. This option will find all such words, and "+
+          "merge them into the current dictionary.<p/>"+
+        "<li/><span>Rebuild the Current Puzzle</span><br/>"+
+          "Use of this option will not affect the words within the puzzle grid, but will refresh the content of the clues. "+
+          "The clues will then reflect any changes which have been made to the dictionary clues since the time the puzzle "+
+          "was first constructed."+
+      "</ul>"+
+      "<li/><span class='s'>Help Menu</span>"+
+        "<ul><li/><span>Crossword Help</span><br/>"+
+          "Displays the Help screen which you are now reading.</ul>"+
+      "</ul>"+
+
+    "<span class='m'>Manual Construction</span>"+
+    "<div>Manual puzzle construction allows you to click into a puzzle cell and type a character directly into that cell. You can build an entire puzzle "+
+    "in this way if you like, but the <b>Suggest a Word</b> and <b>Add a Clue</b> buttons described below will certainly "+
+    "make your job much easier. You can also insert just a few words (or even just a few letters) and then use the automatic build features to complete "+
+    "the puzzle. Be aware though that if you enter too many words and/or letters in this way, you may well create a situation in which it is quite "+
+    "impossible to build the puzzle. Some experimenting with the <b>Suggest a Word</b> button will demonstrate just how readily this can "+
+    "happen.<br/><br/></div>"+
+
+    "<ul>"+
+      "<li><span>Suggest a Word:</span><br/>"+
+        "This button is used during manual puzzle construction. Its operation is described fully in the Help " +
+        "available from the <b>Suggest a Word</b> dialog.<p/>"+
+      "<li/><span>Add a Clue:</span><br/>"+
+        "This button also is used during manual puzzle construction, and its operation is described fully in the Help "+
+        "available from the <b>Add a Clue</b> dialog.<p/>"+
+      "<li/><span>Review Clues:</span><br/>"+
+        "When you click this button, the text area immediately below the button will contain the clue for the word which is"+
+        "currently selected in the displayed puzzle. Each time you make a change to the selected word, the clue displayed "+
+        "will change accordingly. There are three ways of changing the selected word:-"+
+        "<ul>"+
+          "<li/>Use the arrow keys to move the red cursor cell to a new location. One of the words passing through the new "+
+          "cursor cell will become the selected word."+
+          "<li/>Use the mouse to point and click on a new cell within the puzzle."+
+          "<li/>If you wish to review all of the clues within a puzzle, the recommended method is to use the buttons immediately to the left and "+
+             "right of the <b>Review Clues</b> button. This will allow you to step through all of the clues within the puzzle in sequence."+
+        "</ul>"+
+        "When you first clicked the <b>Review Clues</b> button, its label changed to <b>End Review</>. This reminds "+
+        "you that you can terminate the review process by clicking the same button you used to start it.<p/>"+
+      "<li/><span>Cell Type Selection:</span><br/>"+
+        "Crossword Express supports a total of 15 different <b>Cell Types</b> as displayed on the set of 15 cell type buttons. Clicking any of these "+
+        "buttons will set the currently selected puzzle cell to be that type. A discussion on <b>Cell Types</b> is available by selecting Help "+
+        "while editing Grids or creating new ones."+
+    "</ul></body>";
+
+    static void def()
+  { Op.updateOption(Op.DV.DvPuz.ordinal(),         "sample.crossword", Op.dv);
+    Op.updateOption(Op.DV.DvTemplate.ordinal(),    "",                 Op.dv);
+    Op.updateOption(Op.DV.DvDic.ordinal(),         "devanagari",       Op.dv);
+    Op.updateOption(Op.DV.DvW.ordinal(),           "600",              Op.dv);
+    Op.updateOption(Op.DV.DvH.ordinal(),           "690",              Op.dv);
+    Op.updateOption(Op.DV.DvAcross.ordinal(),      "10",               Op.dv);
+    Op.updateOption(Op.DV.DvDown.ordinal(),        "10",               Op.dv);
+    Op.updateOption(Op.DV.DvGrid.ordinal(),        "am13-1.grid",      Op.dv);
+    Op.updateOption(Op.DV.DvCellC.ordinal(),       "FFFFFF",           Op.dv);
+    Op.updateOption(Op.DV.DvPatternC.ordinal(),    "000000",           Op.dv);
+    Op.updateOption(Op.DV.DvGridC.ordinal(),       "000000",           Op.dv);
+    Op.updateOption(Op.DV.DvLettersC.ordinal(),    "000000",           Op.dv);
+    Op.updateOption(Op.DV.DvIDC.ordinal(),         "000000",           Op.dv);
+    Op.updateOption(Op.DV.DvClueFont.ordinal(),    "SansSerif",        Op.dv);
+    Op.updateOption(Op.DV.DvErrorC.ordinal(),      "000000",           Op.dv);
+    Op.updateOption(Op.DV.DvClueC.ordinal(),       "000000",           Op.dv);
+  }
+
+  DevanagariBuild(JFrame jfCWE)
+  { Def.puzzleMode=Def.pM_DEVANAGARI_BUILD;
+    Def.dispSolArray=false;
+    Def.dispCursor=true;
+    Def.dispNullCells=true;
+    Def.dispGuideDigits=true;
+    Def.building=Def.STATE_IDLE;
+    Def.dispWithColor=true;
+    makeGrid();
+
+    jfDevanagari = new JFrame("Devanagari Construction");
+    jfDevanagari.setSize(Op.getInt(Op.DV.DvW.ordinal(), Op.dv), Op.getInt(Op.DV.DvH.ordinal(), Op.dv));
+    int frameX = (jfCWE.getX() + jfDevanagari.getWidth() > Methods.scrW) ? Methods.scrW - jfDevanagari.getWidth()-10 : jfCWE.getX();
+      jfDevanagari.setLocation(frameX, jfCWE.getY());                    //----set x coordinate of frame depending on screen size
+    jfDevanagari.setLayout(null);
+    jfDevanagari.getContentPane().setBackground(Def.COLOR_FRAMEBG);
+    jfDevanagari.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+    jfDevanagari.addComponentListener
+    ( new ComponentAdapter()
+      { @Override public void componentResized(ComponentEvent ce)
+        { int oldw = Op.getInt(Op.DV.DvW.ordinal(), Op.dv);                 //--get old dimensions
+          int oldh = Op.getInt(Op.DV.DvH.ordinal(), Op.dv);
+          Methods.frameResize(jfDevanagari, oldw, oldh, 960, 700);
+          Op.setInt(Op.DV.DvW.ordinal(), jfDevanagari.getWidth(), Op.dv);    //--save new dimensions to options
+          Op.setInt(Op.DV.DvH.ordinal(), jfDevanagari.getHeight(), Op.dv);
+          restoreFrame();
+        }
+      }
+    );
+
+    jfDevanagari.addWindowListener
+    ( new WindowAdapter()
+      { @Override public void windowClosing(WindowEvent we)
+        { if(Def.building==Def.STATE_BUILDING||Def.selecting)
+            return;
+          Op.saveOptions("devanagari.opt", Op.dv);
+          CrosswordExpress.transfer(Def.pM_MENU, jfDevanagari);
+        }
+      }
+    );
+    Methods.closeHelp();
+
+    //----create a Runnable instance to build the puzzle
+    final Runnable buildThread=() ->
+    { Def.dispCursor=false;
+      Methods.havePuzzle=false;
+      focusColor(false);
+      if(buildDevanagari(true))
+      { Methods.havePuzzle=true;
+        saveDevanagari(Op.dv[Op.DV.DvPuz.ordinal()]);
+      }
+      buildMenuItem.setText("Start Building");
+      if(Def.building==Def.STATE_INTERRUPTED)
+      { Def.building=Def.STATE_IDLE;
+        Methods.interrupted(jfDevanagari);
+        makeGrid();
+        restoreFrame();
+        return;
+      }
+      Def.building=Def.STATE_IDLE;
+      if(Methods.havePuzzle)
+      { saveDevanagari(Op.dv[Op.DV.DvPuz.ordinal()]);
+        Methods.puzzleSaved(jfDevanagari, Op.dv[Op.DV.DvDic.ordinal()]+".dic", Op.dv[Op.DV.DvPuz.ordinal()]);
+      }
+      else
+      { makeGrid();
+        Methods.cantBuild(jfDevanagari);
+      }
+    };
+
+    jl1=new JLabel();
+    jfDevanagari.add(jl1);
+    jl2=new JLabel();
+    jfDevanagari.add(jl2);
+//---- CROSSWORD BUILD menu system ---------------------------------------------
+    menuBar=new JMenuBar();
+    menuBar.setBackground(Def.COLOR_MENUBAR);
+    jfDevanagari.setJMenuBar(menuBar);
+    menu=new JMenu("File");
+
+    menuBar.add(menu);
+    { menuItem=new JMenuItem("Select a Dictionary");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { if(Def.building==Def.STATE_BUILDING)
+            return;
+          Methods.selectDictionary(jfDevanagari, Op.dv[Op.DV.DvDic.ordinal()], 1);
+          Op.dv[Op.DV.DvDic.ordinal()]=Methods.dictionaryName;
+          Grid.clearGrid();
+          loadDevanagari(Op.dv[Op.DV.DvPuz.ordinal()]);
+          focusColor(true);
+          restoreFrame();
+        }
+      );
+
+      menuItem=new JMenuItem("Load a Puzzle");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_L, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { if(Def.building==Def.STATE_BUILDING)
+            return;
+          pp.invalidate();
+          restoreFrame();
+          focusColor(false);
+          new Select(jfDevanagari, Op.dv[Op.DV.DvDic.ordinal()]+".dic", "crossword", Op.dv, Op.DV.DvPuz.ordinal(), false);
+        }
+      );
+
+      menuItem=new JMenuItem("Save");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { if(Def.building==Def.STATE_BUILDING)
+            return;
+          saveDevanagari(Op.dv[Op.DV.DvPuz.ordinal()]);
+          Methods.puzzleSaved(jfDevanagari, Op.dv[Op.DV.DvDic.ordinal()]+".dic", Op.dv[Op.DV.DvPuz.ordinal()]);
+          restoreFrame();
+        }
+      );
+
+      menuItem=new JMenuItem("SaveAs");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_A, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { if(Def.building==Def.STATE_BUILDING)
+            return;
+          Methods.puzzleDescriptionDialog(jfDevanagari, Op.dv[Op.DV.DvPuz.ordinal()].substring(0, Op.dv[Op.DV.DvPuz.ordinal()].indexOf(".crossword")), Op.dv[Op.DV.DvDic.ordinal()]+".dic", ".crossword");
+          if(Methods.clickedOK)
+          { saveDevanagari(Op.dv[Op.DV.DvPuz.ordinal()]=Methods.theFileName);
+            restoreFrame();
+            Methods.puzzleSaved(jfDevanagari, Op.dv[Op.DV.DvDic.ordinal()]+".dic", Op.dv[Op.DV.DvPuz.ordinal()]);
+          }
+        }
+      );
+
+      menuItem=new JMenuItem("Quit Construction");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { if(Def.building==Def.STATE_BUILDING)
+            return;
+          Op.saveOptions("devanagari.opt", Op.dv);
+          CrosswordExpress.transfer(Def.pM_MENU, jfDevanagari);
+        }
+      );
+    }
+
+    menu=new JMenu("Build");
+    menuBar.add(menu);
+    { menu.add(menuItem);
+      menu.addSeparator();
+
+      menuItem=new JMenuItem("Start a New Puzzle");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { if(Def.building==Def.STATE_BUILDING)
+            return;
+          Methods.puzzleDescriptionDialog(jfDevanagari, Op.dv[Op.DV.DvPuz.ordinal()].substring(0, Op.dv[Op.DV.DvPuz.ordinal()].indexOf(".crossword")), Op.dv[Op.DV.DvDic.ordinal()]+".dic", ".crossword");
+          if(Methods.clickedOK)
+          { Op.dv[Op.DV.DvPuz.ordinal()]=Methods.theFileName;
+            makeGrid();
+            Grid.loadGrid(Op.dv[Op.DV.DvGrid.ordinal()]);
+          }
+          restoreFrame();
+        }
+      );
+
+      menuItem=new JMenuItem("Select a Dictionary");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { if(Def.building==Def.STATE_BUILDING)
+            return;
+          Methods.selectDictionary(jfDevanagari, Op.dv[Op.DV.DvDic.ordinal()], 1);
+          Op.dv[Op.DV.DvDic.ordinal()]=Methods.dictionaryName;
+          restoreFrame();
+        }
+      );
+
+      menuItem=new JMenuItem("Select a Grid");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_G, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( (ActionEvent ae) ->
+        { if(Def.building==Def.STATE_BUILDING)
+            return;
+          Methods.clearGrid(Grid.letter);
+          focusColor(false);
+          Def.dispCursor=false;
+          Def.dispSolArray=true;
+          Def.puzzleMode=Def.pM_GRID_MTCE;
+
+          JFileChooser chooser = new JFileChooser(System.getProperty("user.dir") + "/grids");
+          chooser.setFileFilter(new FileNameExtensionFilter("Grid", "grid"));
+          chooser.setSelectedFile(new File(Op.dv[Op.DV.DvGrid.ordinal()]));
+          chooser.setAccessory(new Preview(chooser));
+          chooser.setMultiSelectionEnabled(true);
+          if(chooser.showDialog(jfDevanagari, "Select Grid") == JFileChooser.APPROVE_OPTION)
+            grids =  chooser.getSelectedFiles();
+
+          Def.puzzleMode=Def.pM_CROSSWORD_BUILD;
+          if(grids!=null)
+            Op.dv[Op.DV.DvGrid.ordinal()]=grids[0].getName();
+          Grid.loadGrid(Op.dv[Op.DV.DvGrid.ordinal()]);
+          Def.dispSolArray=false;
+          Def.dispCursor=true;
+          focusColor(true);
+          restoreFrame();
+        }
+      );
+
+      buildMenuItem=new JMenuItem("Start Building");
+      buildMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_B, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+      menu.add(buildMenuItem);
+      buildMenuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { if(Op.dv[Op.DV.DvPuz.ordinal()].length()==0)
+          { Methods.noName(jfDevanagari);
+            return;
+          }
+          if(Def.building==Def.STATE_IDLE)
+          { thread=new Thread(buildThread);
+            thread.start();
+            Def.building=Def.STATE_BUILDING;
+            buildMenuItem.setText("Stop Building");
+          }
+          else
+            Def.building=Def.STATE_INTERRUPTED;
+        }
+      );
+
+      menuItem=new JMenuItem("Test 1");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_T, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { String theText, theWord="";
+          int i, j, state=0;
+
+          try
+          { FileWriter fileWriter = new FileWriter(System.getProperty("user.dir") + "/dev.lst", true); //Set true for append mode
+            try (PrintWriter printWriter=new PrintWriter(fileWriter))
+            { theText=(String) Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
+              for(i=0; i<theText.length(); i++)
+              { switch(state)
+                { case 0:
+                    if(devType(theText.charAt(i)) > 0)                  //--first letter of word
+                    { theWord += theText.charAt(i);                     //--save it
+                      state=1;                                          //--look for more letters
+                    }
+                    break;
+                  case 1:
+                    if(devType(theText.charAt(i)) > 0)                  //--another letter of word
+                      theWord += theText.charAt(i);                     //--save it
+                    else
+                    { for(j=0; j<theWord.length(); j++)                 //--use the word
+                        if(devType(theWord.charAt(j)) == 9)
+                          break;
+                      if(j==theWord.length() && devLength(theWord) > 1)
+                        printWriter.println(theWord);
+                      theWord = "";                                     //--prepare for next word
+                      state=0;                                          //--look for start of next word
+                    }
+                    break;
+                }
+              }
+            }
+          }
+          catch(UnsupportedFlavorException|IOException ex)
+          { Logger.getLogger(DevanagariBuild.class.getName()).log(Level.SEVERE, null, ex); }
+        }
+      );
+
+      menuItem=new JMenuItem("Test 2");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_T, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { String theText;
+          int i;
+
+          try
+          { theText=(String) Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
+            for(i=0; i<theText.length(); i++)
+              System.out.print(theText.charAt(i) + "   ");
+            System.out.println();
+            for(i=0; i<theText.length(); i++)
+              System.out.print(String.format("%x", (int)theText.charAt(i)) + "   ");
+            System.out.println(devLength(theText));
+          }
+          catch(UnsupportedFlavorException|IOException ex)
+          { Logger.getLogger(DevanagariBuild.class.getName()).log(Level.SEVERE, null, ex); }
+        }
+      );
+    }
+
+    menu=new JMenu("View");
+    menuBar.add(menu);
+    { menuItem=new JMenuItem("Display Options");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Y, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { if(Def.building==Def.STATE_BUILDING)
+            return;
+          printOptions(jfDevanagari, "Display Options");
+          restoreFrame();
+        }
+      );
+    }
+
+    menu=new JMenu("Print");
+    menuBar.add(menu);
+    { menuItem=new JMenuItem("Print Crossword");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_P, ActionEvent.SHIFT_MASK));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { if(Def.building==Def.STATE_BUILDING) return;
+          Def.puzzleMode=Def.pM_DEVANAGARI_BUILD;
+          CrosswordExpress.toPrint(jfDevanagari, Op.dv[Op.DV.DvPuz.ordinal()]);
+        }
+      );
+
+      menuItem=new JMenuItem("Print Puzzle as Text");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_T, ActionEvent.SHIFT_MASK));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { if(Def.building==Def.STATE_BUILDING)
+            return;
+          if(Methods.havePuzzle)
+            NodeList.exportText(jfDevanagari, true);
+          else
+            Methods.noPuzzle(jfDevanagari, "Export");
+        }
+      );
+    }
+
+    menu=new JMenu("Tasks");
+    menuBar.add(menu);
+    { menuItem=new JMenuItem("Delete this Puzzle");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Z, ActionEvent.ALT_MASK));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { if(Def.building==Def.STATE_BUILDING)
+            return;
+          if(Methods.deleteAPuzzle(jfDevanagari, Op.dv[Op.DV.DvPuz.ordinal()], Op.dv[Op.DV.DvDic.ordinal()]+".dic", pp))
+          { loadDevanagari(Op.dv[Op.DV.DvPuz.ordinal()]);
+            restoreFrame();
+          }
+        }
+      );
+
+      menuItem=new JMenuItem("Transfer Puzzle Clues to Dictionary");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_T, ActionEvent.ALT_MASK));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { if(Def.building==Def.STATE_BUILDING)
+            return;
+          if(!Methods.havePuzzle)
+          { Methods.noPuzzle(jfDevanagari, "Move Clues");
+            return;
+          }
+          Methods.moveCluesToDic(Op.dv[Op.DV.DvDic.ordinal()]);
+          JOptionPane.showMessageDialog(jfDevanagari, "<html><center>The clues used in this puzzle<br>have been moved to the <font color=880000>"
+            +Op.dv[Op.DV.DvDic.ordinal()]+"</font> dictionary");
+          restoreFrame();
+        }
+      );
+
+      menuItem=new JMenuItem("Rebuild the current puzzle");
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, ActionEvent.ALT_MASK));
+      menu.add(menuItem);
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { if(Def.building==Def.STATE_BUILDING)
+            return;
+          if(!Methods.havePuzzle)
+          { Methods.noPuzzle(jfDevanagari, "Rebuild");
+            return;
+          }
+          NodeList.attachClues(Op.dv[Op.DV.DvDic.ordinal()], false);
+          saveDevanagari(Op.dv[Op.DV.DvPuz.ordinal()]);
+          JOptionPane.showMessageDialog(jfDevanagari, "<html><center>The puzzle has been rebuilt and saved.");
+          restoreFrame();
+        }
+      );
+    }
+
+    menu=new JMenu("Help");
+    menuBar.add(menu);
+    { menuItem=new JMenuItem("Crossword Help");
+      menu.add(menuItem);
+      menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_H, ActionEvent.SHIFT_MASK));
+      menuItem.addActionListener
+      ( ( ActionEvent ae) ->
+        { Methods.cweHelp(jfDevanagari, null, "Building Standard Crossword Puzzles", crosswordHelp);
+        }
+      );
+    }
+//------------------------------------------------------------------------------
+    loadDevanagari(Op.dv[Op.DV.DvPuz.ordinal()]);
+    pp=new DevanagariPP(330, 37, jfDevanagari);
+
+    pp.addMouseListener
+    ( new MouseAdapter()
+      { @Override public void mousePressed(MouseEvent e)
+        { updateGrid(e);
+        }
+      }
+    );
+
+    if(Def.isMac)
+      pp.addMouseMotionListener
+      ( new MouseAdapter()
+        { @Override public void mouseMoved(MouseEvent e)
+          { if(Def.isMac)
+              jfDevanagari.setResizable((jfDevanagari.getWidth() - e.getX() < 345) &&
+             (jfDevanagari.getHeight() - e.getY() < 95));
+          }
+        }
+      );
+
+    jfDevanagari.addKeyListener
+    ( new KeyAdapter()
+      { @Override public void keyPressed(KeyEvent e)
+        { handleKeyPressed(e);
+        }
+      }
+    );
+    focusColor(true);
+
+    //--load header of current dictionary
+    DataInputStream dataIn;
+    try
+      { dataIn=new DataInputStream(new FileInputStream(Op.dv[Op.DV.DvDic.ordinal()]+".dic/xword.dic"));
+        dataIn.read(DictionaryMtce.dicHeader, 0, 128);
+        dataIn.close();
+      } catch(IOException exc){}
+
+    restoreFrame();
+  }
+//------------------------------------------------------------------------------
+  static String recoverDevStringFromInt(int devInt)
+  { //--recover one composite dev character from an integer
+    int i;
+    byte[] res = new byte[4];                             //--convert devInt into a byte array
+    ByteBuffer.wrap(res).putInt(devInt);
+    String returnVal = "";
+
+    for(i=0; i<4; i++)
+    { if(res[i] != 0)                                     //--there is a character here
+      { returnVal += (char)((res[i]&0x7F) + 2304);        //--append it to returnVal
+        if((res[i]&0x80) == 0x80)                         //--a virama is present
+          returnVal += (char)0x094D;                      //--append it to returnVal
+      }
+    }
+    return returnVal;
+  }
+//------------------------------------------------------------------------------
+  static boolean devInvalid(String word)
+  { int     state=0, i;
+    boolean badWord=false;
+
+    for(state=i=0; i<word.length(); i++)
+        { if(word.charAt(i)==' ') break;
+          switch(state)
+          { case 0: //--starting a new letter
+              switch(devType(word.charAt(i)))
+              { case 1: //--independent vowel
+                  break;
+                case 2: //--consonant
+                  state = 1;                                                    //--process next letter in state 1
+                  break;
+                default:                                                        //--probably error
+                  badWord = true;
+                  System.out.println("0  " + word);
+              }
+              break;
+            case 1: //--previous consonant
+              switch(devType(word.charAt(i)))
+              { case 1: //--independent vowel
+                  state = 0;
+                  break;
+                case 2: //--another consonant
+                  break;
+                case 3: //--dependent vowel sign
+                  state = 0;                                                    //--process next character in state 0
+                  break;
+                case 4: //--virama
+                  state = 2;                                                    //--process next character in state 2
+                  break;
+                default:                                                        //--probably error
+                  badWord = true;
+                  System.out.println("1  " + word);
+              }
+              break;
+            case 2: //--previous virama
+              switch(devType(word.charAt(i)))
+              { case 2: //--another consonant
+                  state = 1;                                                    //--process next character in state 1
+                  break;
+                default:                                                        //--probably error
+                  badWord = true;
+                  System.out.println("2  " + word);
+              }
+          }
+        }
+    return badWord;
+  }
+//------------------------------------------------------------------------------
+  static int devLength(String theWord)
+  { int    wLen=0, i, state=0;
+
+    for(i=0; i<theWord.length(); i++)
+    { if(theWord.charAt(i)==' ') break;
+      switch(state)
+      { case 0: //--starting a new letter
+          switch(devType(theWord.charAt(i)))
+          { case 1: //--independent vowel
+              wLen++;                                     //--count letter..state unchanged
+              break;
+            case 2: //--consonant
+              wLen++;
+              state = 1;                                  //--process next letter in state 1
+              break;
+          }
+          break;
+        case 1: //--previous consonant
+          switch(devType(theWord.charAt(i)))
+          { case 1: //--independent vowel
+              wLen++;                                     //--step letter count
+              state = 0;
+              break;
+            case 2: //--another consonant
+              wLen++;                                     //--step letter count
+              break;
+            case 3: //--dependent vowel sign
+              state = 0;                                  //--process next character in state 0
+              break;
+            case 4: //--virama
+              state = 2;                                  //--process next character in state 2
+              break;
+          }
+          break;
+        case 2: //--previous virama
+          switch(devType(theWord.charAt(i)))
+          { case 2: //--another consonant
+              state = 1;                                  //--process next character in state 1
+              break;
+          }
+      }
+    }
+
+    return wLen;
+  }
+//------------------------------------------------------------------------------
+  static int devAnalysis(String theWord)
+  { int[]  devLetter = new int[50];                                         //--temp store for letters as they are identified
+    int    devLetterIndex;                                                  //--pointer to where next letter will be stored in devLetter
+    int    wLen=0, i, state=0;
+    String newWord="";
+
+    for(devLetterIndex=i=0; i<theWord.length(); i++)
+    { if(theWord.charAt(i)==' ') break;
+      switch(state)
+      { case 0: //--starting a new letter
+          switch(devType(theWord.charAt(i)))
+          { case 1: //--independent vowel
+              devLetter[devLetterIndex++] = (char)(theWord.charAt(i)%256);  //--save the letter and step to next devLetter
+              wLen++;                                                       //--count letter..state unchanged
+              break;
+            case 2: //--consonant
+              devLetter[devLetterIndex] = (char)(theWord.charAt(i)%256);    //--save the letter, but don't step to next devLetter
+              state = 1;                                                    //--process next letter in state 1
+              break;
+            default:System.out.println("Error 1");                          //--probably error
+          }
+          break;
+        case 1: //--previous consonant
+          switch(devType(theWord.charAt(i)))
+          { case 1: //--independent vowel
+              wLen++;                                                       //--step letter count
+              devLetter[++devLetterIndex] = (char)(theWord.charAt(i)%256);  //--save in next devLetter, but don't step beyond
+              devLetterIndex++;
+              wLen++;
+              state = 0;
+              break;
+            case 2: //--another consonant
+              wLen++;                                                       //--step letter count
+              devLetter[++devLetterIndex] = (char)(theWord.charAt(i)%256);  //--save in next devLetter, but don't step beyond
+              break;
+            case 3: //--dependent vowel sign
+              devLetter[devLetterIndex] *= 256;                             //--make room for the dependent vowel
+              devLetter[devLetterIndex] += (char)(theWord.charAt(i)%256);   //--add the dependent vowel
+              devLetterIndex++;                                             //--step the index
+              wLen++;                                                       //--step letter count
+              state = 0;                                                    //--process next character in state 0
+              break;
+            case 4: //--virama
+              devLetter[devLetterIndex] |= 0x80;                            //--add to current letter
+              state = 2;                                                    //--process next character in state 2
+              break;
+            default:System.out.println("Error 2");                          //--probably error
+          }
+          break;
+        case 2: //--previous virama
+          switch(devType(theWord.charAt(i)))
+          { case 2: //--another consonant
+              devLetter[devLetterIndex] *= 256;                             //--make room for this consonant
+              devLetter[devLetterIndex] += (char)(theWord.charAt(i)%256);   //--add the consonant
+              state = 1;                                                    //--process next character in state 1
+              break;
+            default:System.out.println("Error 3");                          //--probably error
+          }
+      }
+    }
+    for(i=0; i<theWord.length(); i++)
+    { if(devLetter[i]==0) break;
+      newWord+=recoverDevStringFromInt(devLetter[i]);
+    }
+//    if(!theWord.equalsIgnoreCase(newWord))
+//    { System.out.print(theWord + "    " + newWord + "    ");
+//      for(i=0; i<theWord.length(); i++)
+//        System.out.print(theWord.charAt(i) + "  ");
+//      for(i=0; i<theWord.length(); i++)
+//        System.out.print(Integer.toHexString(devLetter[i]) + "  ");
+//
+//      System.out.println();
+//    }
+
+    return wLen;
+  }
+//------------------------------------------------------------------------------
+  static byte devType(char uPoint)
+  { //-- 0 RESERVED
+    //-- 1 INDVOWEL
+    //-- 2 CONSONANT
+    //-- 3 DEPVOWELSIGNS
+    //-- 4 VIRAMA
+    //-- 5 SIGNS
+    //-- 6 ADDCONSTANTS
+    //-- 7 GENERIC ADDITIONS
+    //-- 8 DIGITS
+    //-- 9 REJECT WORD
+
+    if(uPoint < 2304 || uPoint > 2432) return 0;
+    byte theType[] = {0,9,9,9,1,1,1,1,1,1,1,1,1,1,1,1,
+                      1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,
+                      2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+                      2,2,2,2,2,2,2,2,2,2,0,0,9,9,3,3,
+                      3,3,3,3,3,3,3,3,3,3,3,3,3,4,0,0,
+                      5,5,5,5,5,0,0,0,6,6,6,6,6,6,6,6,
+                      7,7,7,7,0,0,8,8,8,8,8,8,8,8,8,8,
+                      9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    };
+    return theType[uPoint %128];
+  }
+//------------------------------------------------------------------------------
+  static void restoreFrame()
+  { jfDevanagari.setVisible(true);
+    Insets insets=jfDevanagari.getInsets();
+    panelW=jfDevanagari.getWidth()-(insets.left+insets.right+330);
+    panelH=jfDevanagari.getHeight()-(insets.top+insets.bottom+37+menuBar.getHeight());
+    pp.setSize(panelW, panelH);
+    Def.dispSolArray=false;
+    Def.dispCursor=true;
+    Def.dispNullCells=true;
+    jfDevanagari.requestFocusInWindow();
+    pp.repaint();
+    Methods.infoPanel(jl1, jl2, "Build देवनागरी", "Dictionary : "+Op.dv[Op.DV.DvDic.ordinal()]
+            +"  -|-  Puzzle : "+Op.dv[Op.DV.DvPuz.ordinal()], jfDevanagari.getWidth());
+  }
+//------------------------------------------------------------------------------
+  static void setSizesAndOffsets(int x, int y, int width, int height, int inset, boolean print)
+  { if(Def.puzzleMode==Def.pM_FRENCH_STYLE)
+    { Grid.xSz++;
+      Grid.ySz++;
+    }
+    int i=(width-inset)/Grid.xSz;
+    int j=(height-inset)/Grid.ySz;
+    Grid.xCell=Grid.yCell=(i<j ? i : j);
+    Grid.xOrg = print ? x+(width-Grid.xSz*Grid.xCell)/2  : 10;
+    Grid.yOrg = print ? y+(height-Grid.ySz*Grid.yCell)/2 : 10;
+    if(Def.puzzleMode==Def.pM_FRENCH_STYLE)
+    { Grid.xSz--;
+      Grid.ySz--;
+      Grid.xOrg+=Grid.xCell;
+      Grid.yOrg+=Grid.yCell;
+    }
+  }
+//------------------------------------------------------------------------------
+  static void printOptions(JFrame jf, String type)
+  { final String[] colorLabel    = {"Cell Color",            "Grid Line Color",       "Letter Color",             "ID Number Color",     "Pattern Color",            "Error Color",            "Clue Color"};
+    final int   [] colorInt      = {Op.DV.DvCellC.ordinal(), Op.DV.DvGridC.ordinal(), Op.DV.DvLettersC.ordinal(), Op.DV.DvIDC.ordinal(), Op.DV.DvPatternC.ordinal(), Op.DV.DvErrorC.ordinal(), Op.DV.DvClueC.ordinal()};
+    final String[] fontLabel     = {"Select Puzzle Font",   "Select ID Font",         "Select Clue Font"};
+    final int   [] fontInt       = {Op.DV.DvFont.ordinal(), Op.DV.DvIDFont.ordinal(), Op.DV.DvClueFont.ordinal()};
+    final String[] checkLabel    = {"PPrint Puzzle with color.", "SPrint Solution with color."};
+    final int   [] checkInt      = {Op.DV.DvPuzC.ordinal(),      Op.DV.DvSolC.ordinal()};
+    Methods.stdPrintOptions(jf, "Devanagari "+ type, Op.dv,
+                                   colorLabel, colorInt,
+                                   fontLabel,  fontInt,
+                                   checkLabel, checkInt);
+  }
+//------------------------------------------------------------------------------
+  public static void saveDevanagari(String devanagariName)
+  { int              i, j;
+    DataOutputStream dataOut;
+
+    try
+    { dataOut=new DataOutputStream(new FileOutputStream(Op.dv[Op.DV.DvDic.ordinal()]+".dic/"+devanagariName));
+      dataOut.writeInt(Grid.xSz);
+      dataOut.writeInt(Grid.ySz);
+      dataOut.writeByte(Methods.noReveal);
+      dataOut.writeByte(Methods.noErrors);
+      for(i=0; i<54; i++)
+        dataOut.writeByte(0);
+      for(j=0; j<Grid.ySz; j++)
+        for(i=0; i<Grid.xSz; i++)
+        { dataOut.writeInt(Grid.mode[i][j]);
+          dataOut.writeInt(Grid.letter[i][j]);
+          dataOut.writeInt(Grid.sol[i][j]);
+          dataOut.writeInt(Grid.color[i][j]);
+        }
+      dataOut.writeUTF(Methods.puzzleTitle);
+      dataOut.writeUTF(Methods.author);
+      dataOut.writeUTF(Methods.copyright);
+      dataOut.writeUTF(Methods.puzzleNumber);
+      dataOut.writeUTF(Methods.puzzleNotes);
+      for(i=0; i<NodeList.nodeListLength; i++)
+      { dataOut.writeUTF(NodeList.nodeList[i].word);
+        dataOut.writeUTF(NodeList.nodeList[i].clue);
+      }
+      dataOut.close();
+    }
+    catch(IOException exc) { }
+    Methods.havePuzzle = true;
+  }
+//------------------------------------------------------------------------------
+  static void loadDevanagari(String devanagariName)
+  { DataInputStream dataIn;
+    int             i, j;
+
+    Op.dv[Op.DV.DvDic.ordinal()] = Methods.confirmDictionary(Op.dv[Op.DV.DvDic.ordinal()] + ".dic", false);
+
+    File fl=new File(Op.dv[Op.DV.DvDic.ordinal()]+".dic/"+devanagariName);
+    if(!fl.exists())
+    { fl=new File(Op.dv[Op.DV.DvDic.ordinal()]+".dic/");
+      String s[]=fl.list();
+      for(i=0; i<s.length; i++)
+        if(s[i].lastIndexOf(".devanagari")!=-1 && s[i].charAt(0) != '.')
+          break;
+
+      if(i==s.length)
+      { makeGrid();
+        return;
+      }
+      devanagariName=s[i];
+      Op.dv[Op.DV.DvPuz.ordinal()]=devanagariName;
+    }
+    try
+    { dataIn=new DataInputStream(new FileInputStream(Op.dv[Op.DV.DvDic.ordinal()]+".dic/"+devanagariName));
+      Grid.xSz=dataIn.readInt();
+      Grid.ySz=dataIn.readInt();
+      Methods.noReveal=dataIn.readByte();
+      Methods.noErrors=dataIn.readByte();
+      for(i=0; i<54; i++)
+        dataIn.readByte();
+      for(j=0; j<Grid.ySz; j++)
+      { for(i=0; i<Grid.xSz; i++)
+        { Grid.mode[i][j]=dataIn.readInt();
+          Grid.letter[i][j]=dataIn.readInt();
+          Grid.sol[i][j]=dataIn.readInt();
+          Grid.color[i][j]=dataIn.readInt();
+        }
+      }
+      Methods.puzzleTitle=dataIn.readUTF();
+      Methods.author=dataIn.readUTF();
+      Methods.copyright=dataIn.readUTF();
+      Methods.puzzleNumber=dataIn.readUTF();
+      Methods.puzzleNotes=dataIn.readUTF();
+      NodeList.buildNodeList();
+      for(i=0; i<NodeList.nodeListLength; i++)
+      { NodeList.nodeList[i].word=dataIn.readUTF();
+        NodeList.nodeList[i].clue=dataIn.readUTF();
+        if(NodeList.nodeList[i].clue.length()<2)
+          NodeList.nodeList[i].clue = "No clue";
+      }
+      dataIn.close();
+    }
+    catch(IOException exc){ }
+
+    Methods.havePuzzle=true;
+    Grid.xCur=NodeList.nodeList[0].x;
+    Grid.yCur=NodeList.nodeList[0].y;
+
+//for(i=0; i<NodeList.nodeListLength; i++)
+//System.out.println(NodeList.nodeList[i].word);
+
+   }
+//------------------------------------------------------------------------------
+  String readString(DataInputStream dataIn, boolean skip)
+  { int c=0;
+    char ch, wordArray[]=new char[100];
+    String str;
+    try
+    { for(c=0;;)
+      { ch=(char) dataIn.readByte();
+        if(skip)  //---- skip the clue number ----
+        { dataIn.readByte();
+          dataIn.readByte();
+          dataIn.readByte();
+          skip=false;
+          continue;
+        }
+        if(ch==13)  //---- signals the end of a string ----
+        { dataIn.readByte();
+          break;
+        }
+        else
+          wordArray[c++]=ch;
+      }
+    } catch(IOException exc) { }
+    str=new String(wordArray, 0, c);
+    return str;
+  }
+//------------------------------------------------------------------------------
+  static void drawDevanagari(Graphics2D g2)
+  { int         i, j, theColor, width, fontSize;
+    int         nL, wL;
+    FontMetrics fm;
+    String      devLetter;
+
+    nL = (int)Math.ceil((float)Grid.xCell/60); wL = (int)Math.ceil((float)Grid.xCell/10);
+    Stroke normalStroke=new BasicStroke(nL, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_MITER);
+    Stroke wideStroke  =new BasicStroke(wL, BasicStroke.CAP_BUTT,   BasicStroke.JOIN_MITER);
+    g2.setStroke(normalStroke);
+    RenderingHints rh=g2.getRenderingHints();
+    rh.put(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+    rh.put(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+    g2.setRenderingHints(rh);
+
+    //----draw the background color
+    for(j=0; j<Grid.ySz; j++)
+    { for(i=0; i<Grid.xSz; i++)
+      { if(Grid.mode[i][j]!=Def.CELL_NULL)
+        { if(Def.dispWithColor && !Def.displaySubmission)
+          { if(Grid.curColor[i][j]!=0xFFFFFF&&Def.dispCursor)
+              theColor=Grid.curColor[i][j];
+            else if(Grid.color[i][j]!=0xFFFFFF)
+              theColor=Grid.color[i][j];
+            else
+              theColor=Op.getColorInt(Op.DV.DvCellC.ordinal(), Op.dv);
+          }
+          else
+            theColor=0xFFFFFF;
+          if(Grid.mode[i][j] == Def.CELL_NULL)
+            theColor = 0xFFFFFF;
+          g2.setColor(new Color(theColor));
+          g2.fillRect(Grid.xOrg+i*Grid.xCell, Grid.yOrg+j*Grid.yCell, Grid.xCell, Grid.yCell);
+        }
+      }
+    }
+
+    if(Def.dispWithColor)
+      Grid.drawPatternCells(g2, new Color(Op.getColorInt(Op.DV.DvPatternC.ordinal(), Op.dv)), new Color(Op.getColorInt(Op.DV.DvCellC.ordinal(), Op.dv)), false);
+    else
+      Grid.drawPatternCells(g2, Def.COLOR_BLACK, Def.COLOR_WHITE, false);
+
+    //--draw the grid lines
+    g2.setStroke(normalStroke);
+    g2.setColor(Def.dispWithColor ? new Color(Op.getColorInt(Op.DV.DvGridC.ordinal(), Op.dv)) : Def.COLOR_BLACK);
+    for(j=0; j<Grid.ySz; j++)
+      for(i=0; i<Grid.xSz; i++)
+        if(Grid.mode[i][j]!=2)
+          g2.drawRect(Grid.xOrg+i*Grid.xCell, Grid.yOrg+j*Grid.yCell, Grid.xCell, Grid.yCell);
+
+    //--draw the letters
+    g2.setColor(Def.dispWithColor ? new Color(Op.getColorInt(Op.DV.DvLettersC.ordinal(), Op.dv)) : Def.COLOR_BLACK);
+    for(j=0; j<Grid.ySz; j++)
+    { for(i=0; i<Grid.xSz; i++)
+      { devLetter = recoverDevStringFromInt(Grid.letter[i][j]);
+        { int fontMult = 24;
+          for(;;)
+          { fontSize = fontMult*Grid.yCell/40;
+            g2.setFont(new Font(Op.dv[Op.DV.DvFont.ordinal()], Font.PLAIN, fontSize));
+            fm=g2.getFontMetrics();
+            width=fm.stringWidth(devLetter);
+            if(width<9*Grid.xCell/10) break;
+            else fontMult--;
+          }
+          g2.drawString(devLetter, Grid.xOrg+i*Grid.xCell+(Grid.xCell-width)/2, Grid.yOrg+j*Grid.yCell+8*Grid.yCell/10);
+        }
+      }
+    }
+
+    //--draw barred cells
+    g2.setStroke(wideStroke);
+    Grid.drawBars(g2);
+
+    Grid.drawOutline(g2, true);                               //--draw a bold outline around the puzzle
+
+    //--draw cursor
+    if(Def.dispCursor && Def.building != Def.STATE_BUILDING && !Def.displaySubmission)
+    { g2.setStroke(wideStroke);
+      g2.setColor(Def.COLOR_RED);
+      g2.drawRect(Grid.xOrg+ Grid.RorL(Grid.xCur)*Grid.xCell, Grid.yOrg+Grid.yCur*Grid.yCell, Grid.xCell, Grid.yCell);
+    }
+
+    //--draw ID digits
+    if(Def.dispGuideDigits || Op.getBool(Op.DV.DvIDC.ordinal(), Op.dv))
+    { g2.setFont(new Font(Op.cw[Op.CW.CwIDFont.ordinal()], Font.PLAIN, Grid.yCell/3));
+      g2.setColor(Def.dispWithColor ? new Color(Op.getColorInt(Op.DV.DvIDC.ordinal(), Op.dv)) : Def.COLOR_BLACK);
+      fm=g2.getFontMetrics();
+      for(i=0; NodeList.nodeList[i]!=null; i++)
+      { int drawI = NodeList.nodeList[i].x;
+        int xCoord = Grid.xOrg+drawI*Grid.xCell + ((Grid.xCell/20>1 ? Grid.xCell/20 : 1));
+        g2.drawString(""+NodeList.nodeList[i].id, xCoord, Grid.yOrg+NodeList.nodeList[i].y*Grid.yCell+fm.getAscent());
+      }
+    }
+    g2.setStroke(new BasicStroke(1));
+  }
+//------------------------------------------------------------------------------
+  static void printPuz(Graphics2D g2, int left, int top, int width, int height)
+  { loadDevanagari(Op.dv[Op.DV.DvPuz.ordinal()]);
+    setSizesAndOffsets(left, top, width, height, 0, true);
+    Methods.clearGrid(Grid.sol);
+    Def.dispGuideDigits=true;
+    Def.dispWithColor=Op.getBool(Op.DV.DvPuzC.ordinal(), Op.dv);
+    drawDevanagari(g2);
+    Def.dispWithColor=true;
+  }
+//------------------------------------------------------------------------------
+  static void printSol(Graphics2D g2, int left, int top, int width, int height, String solutionPuzzle)
+  { loadDevanagari(solutionPuzzle);
+    setSizesAndOffsets(left, top, width, height, 0, true);
+    Def.dispGuideDigits=false;
+    Def.dispWithColor=Op.getBool(Op.DV.DvSolC.ordinal(), Op.dv);
+    drawDevanagari(g2);
+    Def.dispWithColor=true;
+    Def.dispGuideDigits=true;
+    loadDevanagari(Op.dv[Op.DV.DvPuz.ordinal()]);
+  }
+//------------------------------------------------------------------------------
+  static void printSolTitle(Graphics2D g2, int left, int top, int width, int height, String solutionPuzzle)
+  { loadDevanagari(solutionPuzzle);
+    Print.outputTextItem(g2, left, top, width, height, "SansSerif", Font.PLAIN, Methods.puzzleTitle);
+    loadDevanagari(Op.dv[Op.DV.DvPuz.ordinal()]);
+  }
+//------------------------------------------------------------------------------
+  @Override public void actionPerformed(ActionEvent e)
+  { int i, x, y, previous;
+    int oldX = Grid.xCur, oldY = Grid.yCur;
+
+    if(Grid.letter[Grid.xCur][Grid.yCur] != 0)
+    { JOptionPane.showMessageDialog(jfDevanagari, "Changing a cell type is not permitted if the cell contains a letter.");
+      return;
+    }
+
+    for(i=0; i<15; i++)
+      if(e.getActionCommand().equals(""+ i))
+      { previous = Grid.mode[Grid.xCur][Grid.yCur];
+        Grid.mode[Grid.xCur][Grid.yCur] = i;
+        if(GridMaintenance.validCellType(Grid.xCur, Grid.yCur))
+        { if(!GridMaintenance.symmetryUpdate(Grid.xCur, Grid.yCur, previous, Grid.mode[Grid.xCur][Grid.yCur]))
+          { JOptionPane.showMessageDialog(jfDevanagari, "A symmetrical cell already contains a letter.\nThe process cannot be completed.");
+            Grid.mode[Grid.xCur][Grid.yCur] = previous;
+          }
+        }
+        else
+        { JOptionPane.showMessageDialog(jfDevanagari, "The cell type you have selected is not valid for\nthis combination of location and symmetry.");
+          Grid.mode[Grid.xCur][Grid.yCur] = previous;
+          return;
+        }
+        NodeList.buildNodeList();
+        Grid.xCur = oldX; Grid.yCur = oldY;
+        for(y=0; y<Grid.ySz; y++)
+          for(x=0; x<Grid.xSz; x++)
+            Grid.curColor[x][y] = 0xFFFFFF;
+        pp.repaint();
+      }
+  }
+//------------------------------------------------------------------------------
+  static void makeGrid()
+  { Methods.havePuzzle=false;
+    Grid.clearGrid();
+    Grid.loadGrid(Op.dv[Op.DV.DvGrid.ordinal()]);
+  }
+//------------------------------------------------------------------------------
+  static void focusColor(boolean set)
+  { for(int i=0; i<NodeList.nodeList[Grid.nCur].length; i++)
+      Grid.curColor[NodeList.nodeList[Grid.nCur].cellLoc[i].x][NodeList.nodeList[Grid.nCur].cellLoc[i].y]=set ? Def.focusWord : 0xFFFFFF;
+  }
+//------------------------------------------------------------------------------
+  static void changeCursor()
+  { int targetNodeA, targetNodeD;
+    if(Grid.nCur!=-1)
+      focusColor(false);
+
+    targetNodeA=Grid.horz[Grid.xNew][Grid.yNew];
+    targetNodeD=Grid.vert[Grid.xNew][Grid.yNew];
+    if(Grid.xCur==Grid.xNew&&Grid.yCur==Grid.yNew)
+    { if(targetNodeA!=-1&&targetNodeD!=-1)
+        Grid.nCur=Grid.nCur==targetNodeA ? targetNodeD : targetNodeA;
+    }
+    else
+    { if((targetNodeA==Grid.nCur||targetNodeD==Grid.nCur)&&Grid.nCur!=-1)
+      { } //----do nothing
+      else
+      { if(Grid.xCur==Grid.xNew)
+          Grid.nCur=targetNodeD!=-1 ? targetNodeD : targetNodeA;
+        else
+          Grid.nCur=targetNodeA!=-1 ? targetNodeA : targetNodeD;
+      }
+      Grid.xCur=Grid.xNew;
+      Grid.yCur=Grid.yNew;
+    }
+    if(Grid.nCur!=-1)
+      focusColor(true);
+  }
+//------------------------------------------------------------------------------
+  void insertWord(int index)
+  { Node thisNode=NodeList.nodeList[index];
+    thisNode.pending=false;
+    for(int i=0; i<thisNode.length; i++)
+    { int x=thisNode.cellLoc[i].x;
+      int y=thisNode.cellLoc[i].y;
+      if(++Grid.control[x][y]==1)
+        Grid.letter[x][y] = thisNode.devWord[i];
+    }
+    busy[thisNode.length][thisNode.wordIndex]=true;               //--mark this word as busy
+  }
+//------------------------------------------------------------------------------
+  void extractWord(int index)
+  { Node thisNode=NodeList.nodeList[index];
+    thisNode.pending=true;
+    for(int i=0; i<thisNode.length; i++)
+    { int x=thisNode.cellLoc[i].x;
+      int y=thisNode.cellLoc[i].y;
+      if(--Grid.control[x][y]==0)
+        Grid.letter[x][y]= 0;
+    }
+    busy[thisNode.length][thisNode.wordIndex]=false;              //--mark this word as free
+  }
+//------------------------------------------------------------------------------
+  boolean depend(int subjectIndex, int compareIndex)  //--compare two nodes specified by subjectIndex and compareIndex
+  { Node subjectNode=NodeList.nodeList[subjectIndex]; //--return true if they intersect, otherwise return false
+    for(int i=0; i<subjectNode.length; i++)
+    { int x=subjectNode.cellLoc[i].x;
+      int y=subjectNode.cellLoc[i].y;
+      if(compareIndex==Grid.horz[x][y]||compareIndex==Grid.vert[x][y])
+        return true;
+    }
+    return false;
+  }
+//------------------------------------------------------------------------------
+  void busyNode(int index)
+  { //----used during the ordering process of the node list
+    //----it updates the control array, and marks the node as busy (pending = false)
+    int i, j, x, y, scanIndex, scanX, scanY;
+    Node thisNode, scanNode;
+    thisNode=NodeList.nodeList[index];                                        // get the node we want to busy
+    for(i=0; i<thisNode.length; i++)                                          // for each letter of the word
+    { x=thisNode.cellLoc[i].x;
+      y=thisNode.cellLoc[i].y;                                                // find its x and y coordinates
+      Grid.letter[x][y]=-1;                                                   // mark letter grid entry as occupied
+      scanIndex=(index==Grid.horz[x][y] ? Grid.vert[x][y] : Grid.horz[x][y]); // get index of the word which intersects at this point
+      if(scanIndex!=-1)                                                       // there is such a word
+      { scanNode=NodeList.nodeList[scanIndex];                                // get the node we want to scan
+        for(j=0; j<scanNode.length; j++)                                      // for each letter in the word of this node
+        { scanX=scanNode.cellLoc[j].x;
+          scanY=scanNode.cellLoc[j].y;                                        // find its x and y coordinates
+          Grid.control[scanX][scanY]++;                                       // update the control grid
+        }
+      }
+    }
+    thisNode.pending=false;                                                   // busy this node
+  }
+//------------------------------------------------------------------------------
+  int links, contax, contax2, earlyLink, form;
+  void evaluateNode(int index)
+  { //----used during the ordering process of the node list
+    //----it calculates a number of values which determine the best node to fill next
+    links=contax=contax2=form=0;
+    earlyLink=500;
+    Node thisNode=NodeList.nodeList[index];
+    for(int i=0; i<thisNode.length; i++)                                            //----for each letter in this node
+    { int x=thisNode.cellLoc[i].x;                                                  //----get x coordinate
+      int y=thisNode.cellLoc[i].y;                                                  //----get y coordinate
+      if(Grid.letter[x][y]==-1)                                                     //----this letter is already in place
+        links++;                                                                    //----so we have a link
+      else
+      { contax+=Grid.control[x][y];                                                 //----this letter is not yet in place
+        if(form==0)
+          form=1;
+        int scanIndex=(index==Grid.horz[x][y] ? Grid.vert[x][y] : Grid.horz[x][y]);
+        if(scanIndex!=-1)                                                           //----there is a word intersecting at this point
+        { form=2;
+          if(scanIndex<earlyLink)
+            earlyLink=scanIndex;
+          Node scanNode=NodeList.nodeList[scanIndex];
+          int sLinks=0;
+          for(int j=0; j<scanNode.length; j++)
+          { int scanX=scanNode.cellLoc[j].x;
+            int scanY=scanNode.cellLoc[j].y;
+            if(Grid.letter[scanX][scanY]==-1)
+              sLinks++;
+            else if(x!=scanX||y!=scanY)
+              contax2+=Grid.control[scanX][scanY];
+          }
+          contax2-=(sLinks*(scanNode.length-1-sLinks));
+        }
+      }
+    }
+    contax=contax-links*(thisNode.length-links);
+    if(form==2&&(contax>0||contax2>0))
+      form=3;
+  }
+//------------------------------------------------------------------------------
+  void orderNodeList()
+  { int i, j, x, y, index, rIndex=0, starts, ends;
+    int maxLinks, maxContax, maxContax2, leastEarlyLink, bestForm;
+    int nodeOrder[]=new int[800];
+    //----prepare grid, nodelist for ordering process
+    for(i=0; i<50; i++)
+      for(j=0; j<50; j++)
+        Grid.control[i][j]=0;
+    for(i=0; i<NodeList.nodeListLength; i++)
+      NodeList.nodeList[i].pending=true;
+
+    busyNode(nodeOrder[0]=0);
+    for(i=1; i<NodeList.nodeListLength; i++)
+    { for(maxLinks=maxContax=maxContax2=bestForm=0, leastEarlyLink=10000, index=1; index<NodeList.nodeListLength; index++)
+      { if(!NodeList.nodeList[index].pending)
+        { continue;                         //----this node has already been handled
+        }
+        evaluateNode(index);
+        if(form<2) { } //----no linking implications for this node, so fill it next
+        else if(bestForm==2&&links>0&&form==3) { }
+        else if(bestForm==3&&maxLinks>0&&form==2) { continue; }
+        else if(links<maxLinks) { continue; }
+        else if(links==maxLinks)
+        { if(contax<maxContax)
+            continue;
+          if(contax==maxContax)
+          { if(earlyLink>=leastEarlyLink) continue;
+            if(contax2<maxContax2) continue;
+          }
+        }
+        //----found a better candidate for next node, so remember it
+        maxLinks=links;
+        maxContax=contax;
+        maxContax2=contax2;
+        leastEarlyLink=earlyLink;
+        bestForm=form;
+        rIndex=index;
+        if(bestForm<2)
+          break;                                                 //----no linking implications for this node, so fill it next
+      }
+      busyNode(nodeOrder[i]=rIndex);
+    }
+    //----set the order of the node list according to the nodeOrder array
+    Node thisNode;
+    for(i=1; i<NodeList.nodeListLength; i++)
+    { thisNode=NodeList.nodeList[i];
+      NodeList.nodeList[i]=NodeList.nodeList[nodeOrder[i]];
+      NodeList.nodeList[nodeOrder[i]]=thisNode;
+      for(j=i; j<NodeList.nodeListLength; j++)
+      { if(nodeOrder[j]==i)
+        { nodeOrder[j]=nodeOrder[i];
+          break;
+        }
+      }
+    }
+
+    for(i=0; i<50; i++)
+    { for(j=0; j<50; j++)
+      { Grid.letter[i][j]=Grid.control[i][j]=0;         //--clear letter and control arrays
+        Grid.horz[i][j]=Grid.vert[i][j]=-1;             //--negate horz and vert arrays
+      }
+    }
+    for(i=0; i<NodeList.nodeListLength; i++)
+    { NodeList.nodeList[i].pending=true;
+      NodeList.nodeList[i].wordIndex=-1;
+      for(j=0; j<NodeList.nodeList[i].length; j++)
+      { x=NodeList.nodeList[i].cellLoc[j].x;
+        y=NodeList.nodeList[i].cellLoc[j].y;
+        if(Grid.horz[x][y]==-1)                         //--must be handling ACROSS word
+          Grid.horz[x][y]=i;
+        else                                            //--must be DOWN word
+          Grid.vert[x][y]=i;
+      }
+    }
+  }
+//------------------------------------------------------------------------------
+  static boolean loadDictionary()
+  { int             len, i, j, puzWords[]=new int[50], wordData;
+    int             state=0, wLen;
+    int[]           devLetter = new int[50];                                //--temp store for letters as they are identified
+    int             devLetterIndex;                                         //--pointer to where next letter will be stored in devLetter
+    String          word;
+    DataInputStream dataIn;
+    boolean         badWord;
+    int             count=0;
+
+    for(i=0; i<NodeList.nodeListLength; i++)                                //--count the words required at each length
+      puzWords[NodeList.nodeList[i].length]++;
+    for(i=0; i<50; wordCount[i++]=0){}                                      //--initialise word counters to zero
+
+    //----stage 1...count the dictionary words
+    try
+    { dataIn=new DataInputStream(new FileInputStream(Op.dv[Op.DV.DvDic.ordinal()]+".dic/xword.dic"));
+      dataIn.read(DictionaryMtce.dicHeader, 0, 128);
+      for(; dataIn.available()>2;)
+      { dataIn.readInt();
+        word=dataIn.readUTF();
+        if((j = devLength(word))>1)
+          wordCount[j]++;                                                   //--if length >1 step word length counter
+        dataIn.readUTF();                                                   //----skip the clue
+      }
+      dataIn.close();
+    } catch(IOException exc){}
+
+    //----stage 2...create the character, busy and link arrays
+    for(len=2; len<50; len++)
+      if(wordCount[len]>0)
+      { chInt[len] = new int     [wordCount[len]][len];
+        busy[len]     = new boolean [wordCount[len]];
+        revLink[len]  = new int     [wordCount[len]];
+        for(i=0; i<wordCount[len]; i++) revLink[len][i] = i;
+      }
+
+    //----stage 3...load the words
+    for(i=0; i<50; wordCount[i++]=0){}
+    try
+    { dataIn=new DataInputStream(new FileInputStream(Op.dv[Op.DV.DvDic.ordinal()]+".dic/xword.dic"));
+      for(i=0; i<128; i++)
+        dataIn.readByte();
+      for(; dataIn.available()>2;)
+      { wordData=dataIn.readInt();
+        word=dataIn.readUTF();
+        wLen = 0;
+        badWord = false;
+
+        for(state=0, devLetterIndex=i=0; i<word.length(); i++)
+        { if(word.charAt(i)==' ') break;
+          switch(state)
+          { case 0: //--starting a new letter
+              switch(devType(word.charAt(i)))
+              { case 1: //--independent vowel
+                  devLetter[devLetterIndex++] = (char)(word.charAt(i)%256);     //--save the letter and step to next devLetter
+                  wLen++;                                                       //--count letter..state unchanged
+                  break;
+                case 2: //--consonant
+                  devLetter[devLetterIndex] = (char)(word.charAt(i)%256);       //--save the letter, but don't step to next devLetter
+                  wLen++;
+                  state = 1;                                                    //--process next letter in state 1
+                  break;
+                default:                                                        //--probably error
+                  badWord = true;
+              }
+              break;
+            case 1: //--previous consonant
+              switch(devType(word.charAt(i)))
+              { case 1: //--independent vowel
+                  wLen++;                                                       //--step letter count
+                  devLetter[++devLetterIndex] = (char)(word.charAt(i)%256);     //--save in next devLetter, but don't step beyond
+                  devLetterIndex++;
+                  state = 0;
+                  break;
+                case 2: //--another consonant
+                  wLen++;                                                       //--step letter count
+                  devLetter[++devLetterIndex] = (char)(word.charAt(i)%256);     //--save in next devLetter, but don't step beyond
+                  break;
+                case 3: //--dependent vowel sign
+                  devLetter[devLetterIndex] *= 256;                             //--make room for the dependent vowel
+                  devLetter[devLetterIndex] += (char)(word.charAt(i)%256);      //--add the dependent vowel
+                  devLetterIndex++;                                             //--step the index
+                  state = 0;                                                    //--process next character in state 0
+                  break;
+                case 4: //--virama
+                  devLetter[devLetterIndex] |= 0x80;                            //--add to current letter
+                  state = 2;                                                    //--process next character in state 2
+                  break;
+                default:                                                        //--probably error
+                  badWord = true;
+                  for(j=0; j<word.length(); j++)
+                    System.out.print(word.charAt(j) + "  ");
+                  for(j=0; j<word.length(); j++)
+                    System.out.print(String.format("%x", (int)word.charAt(j)) + "   ");
+                  System.out.println("1  " + word);
+              }
+              break;
+            case 2: //--previous virama
+              switch(devType(word.charAt(i)))
+              { case 2: //--another consonant
+                  devLetter[devLetterIndex] *= 256;                             //--make room for this consonant
+                  devLetter[devLetterIndex] += (char)(word.charAt(i)%256);      //--add the consonant
+                  state = 1;                                                    //--process next character in state 1
+                  break;
+                default:                                                        //--probably error
+                  badWord = true;
+                  for(j=0; j<word.length(); j++)
+                    System.out.print(word.charAt(j) + "  ");
+                  for(j=0; j<word.length(); j++)
+                    System.out.print(String.format("%x", (int)word.charAt(j)) + "   ");
+                  System.out.println("2  " + word);
+              }
+          }
+        }
+
+/*
+System.out.print(word + " : ");
+for(int q=0; q<word.length(); q++)
+  System.out.print(word.charAt(q) + " ");
+System.out.println();
+
+for(int q=0; ; q++)
+{ if(devLetter[q] == 0) break;
+  System.out.print(recoverDevStringFromInt(devLetter[q]) + " ");
+}
+System.out.println("\n");
+*/
+
+
+        if(wLen>1 && !badWord)
+          if((wordData%256)!=0xFF)                                              //--store word if not locked out
+          { for(i=0; i<wLen; i++)
+              chInt[wLen][wordCount[wLen]][i] = devLetter[i];
+            wordCount[wLen]++;
+          }
+
+        dataIn.readUTF();                                                       //--read the next word
+for(int q=0; ; q++)
+{ if(devLetter[q] == 0) break;
+  devLetter[q] = 0;
+}
+      }
+      dataIn.close();
+    } catch(IOException exc){}
+
+    for(i=0; i<50; i++)
+      if(puzWords[i]>wordCount[i])
+        return false;
+    return true;
+  }
+//------------------------------------------------------------------------------
+  int firstBinarySearch(int[] template, int wlen, int tlen)
+  { int first=0, last=wordCount[wlen]-1, current, i;
+
+    for(;;)
+    { current=(first+last)/2;
+      for(i=0; i<tlen; i++)
+      { if(template[i]>chInt[wlen][current][i])
+        { first=current;
+          break;
+        }
+        else if(template[i]<chInt[wlen][current][i])
+        { last=current;
+          break;
+        }
+      }
+      if(i==tlen)
+        last=current;
+      if(last-first<=1)
+        return first;
+    }
+  }
+//------------------------------------------------------------------------------
+  int lastBinarySearch(int[] template, int wlen, int tlen)
+  { int first=0, last=wordCount[wlen]-1, current, i;
+    for(;;)
+    { current=(first+last)/2;
+      for(i=0; i<tlen; i++)
+      { if(template[i]<chInt[wlen][current][i])
+        { last=current;
+          break;
+        }
+        else if(template[i]>chInt[wlen][current][i])
+        { first=current;
+          break;
+        }
+      }
+      if(i==tlen)
+        first=current;
+      if(last-first<=1)
+        return last;
+    }
+  }
+//------------------------------------------------------------------------------
+  boolean findMatchingWord(int nodeIndex)
+  { Random r=new Random();
+    int i, j=0, length, tlen, temp[]=new int[3];
+    Node thisNode=NodeList.nodeList[nodeIndex];
+
+    length=thisNode.length;
+    if(wordCount[length]==0)
+      return false;                                                             //--no words of this length in this dictionary
+
+    for(i=0; i<length; i++)
+    { temp[i]=thisNode.devTemplate[i];                                          //--create a intArray to store template
+      System.out.print(recoverDevStringFromInt(thisNode.devWord[i]) + " ");
+    }
+System.out.println();
+    if(thisNode.wordIndex!=-1)                                                  //--resuming a previous search
+      do                                                                        //--jump to next word to start scanning
+      { if(++thisNode.wordIndex>thisNode.last)                                  //--reached end of search list
+          thisNode.wordIndex=thisNode.first;                                    //--wrap to beginning of list
+        if(thisNode.wordIndex==thisNode.start)                                  //--end of list with no word found
+        { thisNode.wordIndex=-1;                                                //--indicates that search failed
+          return false;
+        }
+      } while(busy[length][thisNode.wordIndex]);                                //--scan over busy words
+    else                                                                        //--start new search from a random location
+    { if(temp[0]==' ')                                                          //--template starts with a space
+      { thisNode.first=0;                                                       //--so search starts right at the beginning
+        thisNode.last=wordCount[length]-1;                                      //--and goes right to the end
+      }
+      else
+      { for(tlen=0; tlen<length; tlen++)
+          if(temp[tlen]==' ')
+            break;
+        thisNode.first=firstBinarySearch(temp, length, tlen);                   //--get address of first word to be tested for match
+        thisNode.last=lastBinarySearch(temp, length, tlen);                     //--get address of last word to be tested for match
+        if(thisNode.last-thisNode.first<0)                                      //--no suitable words for testing
+          return false;                                                         //--search has failed
+      }
+      thisNode.wordIndex=thisNode.start=thisNode.first+r.nextInt(thisNode.last-thisNode.first+1);//--go to a random location
+    }
+
+    for(;;)                                                                     //--now we can start the search
+    { if(!busy[length][thisNode.wordIndex])                                     //--if current word is free
+      { for(j=0; j<length; j++)                                                 //--for each letter of the word
+          if(temp[j] != 0 && temp[j] != chInt[length][thisNode.wordIndex][j])   //--
+            break;
+      }
+
+  System.out.println(j);
+
+    if(j==length)                                                             //--match found
+      { for(i=0; i<length; i++)
+        { thisNode.devWord[i]=chInt[length][thisNode.wordIndex][i];
+          System.out.print(recoverDevStringFromInt(thisNode.devWord[i]) + " ");
+        }
+        System.out.println();
+        return true;
+      }
+      do
+      { if(++thisNode.wordIndex>thisNode.last)                                  //--at end of list of words being searched
+          thisNode.wordIndex=thisNode.first;                                    //--jump to beginning of list of words being searched
+        if(thisNode.wordIndex==thisNode.start)                                  //--end of list with no word found
+        { thisNode.wordIndex=-1;                                                //--indicate that search failed
+          return false;
+        }
+      } while(busy[length][thisNode.wordIndex]);
+    }
+  }
+//------------------------------------------------------------------------------
+  boolean findMatch(int index)
+  { for(;;)
+    { if(findMatchingWord(index))                                               //--if a matching word is found
+        return true;                                                            //--search is done
+      else if(NodeList.nodeList[index].source>0)                                //--if there are other source dictionaries
+      { NodeList.nodeList[index].source--;                                      //--step to another source dictionary
+        NodeList.nodeList[index].wordIndex=-1;
+      }
+      else
+        return false;
+    }
+  }
+//------------------------------------------------------------------------------
+  boolean wordOK(int index)
+  { int  x, y, scanIndex;
+    Node scanNode;
+
+    Node thisNode=NodeList.nodeList[index];                                     //--get thisNode using index
+    for(int i=0; i<thisNode.length; i++)                                        //--for each element of thisNode
+    { x=thisNode.cellLoc[i].x; y=thisNode.cellLoc[i].y;                         //--get coordinates of its letter
+      scanIndex=(index==Grid.horz[x][y] ? Grid.vert[x][y] : Grid.horz[x][y]);   //--scanIndex is index of linking word
+      if(scanIndex!=-1)                                                         //--there is a linking word
+      { scanNode=NodeList.nodeList[scanIndex];                                  //--get scanNode using scanIndex
+        if(scanNode.pending)                                                    //--scanNode not yet filled
+        { NodeList.buildTemplate(scanIndex);                                    //--build template for this node
+          scanNode.source=0;                                                    //--get dictionary required by this node
+          scanNode.wordIndex=-1;                                                //--negate wordIndex of this node
+          if(!findMatch(scanIndex))                                             //--can't find a word for this node
+            return false;                                                       //--so return false
+        }
+      }
+    }
+    return true;                                                                //--can find a word for each node
+  }
+//------------------------------------------------------------------------------
+  void treeExtract(int index)
+  { int sIndex;
+    for(sIndex=index+1; sIndex<NodeList.nodeListLength; sIndex++)
+      if(depend(index, sIndex)&&!NodeList.nodeList[sIndex].pending)
+        treeExtract(sIndex);
+    extractWord(index);
+  }
+//------------------------------------------------------------------------------
+  int fillCrossword()
+  { int j, nodeIndex;
+
+    NodeList.buildTemplate(nodeIndex=0);
+    NodeList.nodeList[nodeIndex].source=0;
+    for(j=0;;)
+    { if(findMatch(nodeIndex))
+      { insertWord(nodeIndex);
+        if(wordOK(nodeIndex))
+        { NodeList.nodeList[nodeIndex].failCount=0;
+          for(; nodeIndex<NodeList.nodeListLength&&!NodeList.nodeList[nodeIndex].pending; nodeIndex++){}
+
+          //----find first word not yet entered
+          if(++j%50 == 0)
+          { restoreFrame();
+            if(Def.building==Def.STATE_INTERRUPTED)
+              return 0; //----interrupted by user
+          }
+          if(nodeIndex<NodeList.nodeListLength)
+          { NodeList.nodeList[nodeIndex].wordIndex=-1;
+            NodeList.buildTemplate(nodeIndex);
+            NodeList.nodeList[nodeIndex].source=0;
+          }
+          else
+            break;
+          continue;
+        }
+        extractWord(nodeIndex);
+      }
+      else                                                                      //--no match found...revert to a previous node
+      { if(nodeIndex==0)                                                        //--no previous nodes
+          return 0;                                                             //--puzzle building failed
+
+        if(++NodeList.nodeList[nodeIndex].failCount > 500)
+        { NodeList.nodeList[nodeIndex].failCount=0;
+          nodeIndex = problemNode(nodeIndex);
+        }
+        else
+          nodeIndex=NodeList.nodeList[nodeIndex].revert;
+        treeExtract(nodeIndex);
+      }
+      if(j>500000)
+        return 2;
+    }
+
+    return 1;                                                                   //--puzzle building was successful
+  }
+//------------------------------------------------------------------------------
+  int problemNode(int subjectNode)
+  { int problemNode=1000, i, x, y, testNode;
+
+    for(i=0; i<NodeList.nodeList[subjectNode].length; i++)                              //----check for an intersecting problem node
+    { x = NodeList.nodeList[subjectNode].cellLoc[i].x; y = NodeList.nodeList[subjectNode].cellLoc[i].y;
+      testNode = (Grid.horz[x][y] == subjectNode) ? Grid.vert[x][y] : Grid.horz[x][y];
+      if(testNode != -1)
+        if(!NodeList.nodeList[testNode].pending && testNode < problemNode)                //----potential problem node
+         problemNode = testNode;
+    }
+    return problemNode;
+  }
+//------------------------------------------------------------------------------
+  boolean buildDevanagari(boolean loadDic)
+  { boolean ret=true;
+    int     i, j, index, rIndex;
+    Node    thisNode;
+
+    for(;;)
+    { orderNodeList();
+      if(loadDic)
+      { if(!loadDictionary())
+          return false;
+      }
+      else
+        for(int source=0; source<5; source++)
+          for(int length=2; length<50; length++)
+            for(int n=0; n<wordCount[length]; n++)
+              busy[length][n]=false;
+
+      //----set the revert node for each node in the list
+      for(index=1; index<NodeList.nodeListLength; index++)
+      { thisNode=NodeList.nodeList[index];
+        for(thisNode.revert=rIndex=index-1; rIndex>0; rIndex--)
+        { if(depend(rIndex, index))
+          { thisNode.revert=rIndex==0 ? index-1 : rIndex;
+            break;
+          }
+        }
+      }
+
+      switch(fillCrossword())
+      { case 0:                                                         //--puzzle building failed
+          ret=false;
+          break;
+        case 1:                                                         //--puzzle building was successful
+          ret=true;
+          break;
+        case 2:
+          continue;
+      }
+
+      if(ret)                                                           //--we have a new puzzle
+      { System.out.println();
+        for(j=0; j<NodeList.nodeListLength; j++)
+        { NodeList.nodeList[j].word = "";
+          for(i=0; i<NodeList.nodeList[j].devWord.length; i++)
+          { if(NodeList.nodeList[j].devWord[i] > 0)
+              NodeList.nodeList[j].word += recoverDevStringFromInt(NodeList.nodeList[j].devWord[i]);
+          }
+//          System.out.print(NodeList.nodeList[j].word+" "+NodeList.nodeList[j].id+" "+(NodeList.nodeList[j].direction==0?'A':'D'));
+//          System.out.println(); System.out.println();
+        }
+
+        for(j=0; j<NodeList.nodeListLength; j++)
+          validateNode(j);
+
+        NodeList.attachClues(Op.dv[Op.DV.DvDic.ordinal()], false);
+        NodeList.sortNodeList(NodeList.GRIDORDER);                      //--puzzle must be in grid order before saving
+        NodeList.rebuildHorzAndVert();
+      }
+      restoreFrame();
+
+      return ret;
+    }
+  }
+//------------------------------------------------------------------------------
+  void validateNode(int index)
+  { Node   thisNode;
+    int    i;
+    String str="";
+
+
+    thisNode = NodeList.nodeList[index];
+    for(i=0; i<thisNode.length; i++)
+      str += recoverDevStringFromInt(Grid.letter[thisNode.cellLoc[i].x][thisNode.cellLoc[i].y]);
+    if(!thisNode.word.equals(str))
+      System.out.println(thisNode.word + " " + str+"   "+NodeList.nodeList[index].id+" "+(NodeList.nodeList[index].direction==0?'A':'D'));
+  }
+//------------------------------------------------------------------------------
+  void updateGrid(MouseEvent e)
+  { int i, j, x=e.getX(), y=e.getY();
+
+    if(Def.building==Def.STATE_BUILDING)
+      return;
+    if(x<Grid.xOrg||y<Grid.yOrg)
+      return;
+    i=(x-Grid.xOrg)/Grid.xCell;
+    j=(y-Grid.yOrg)/Grid.yCell;
+    if(i>=Grid.xSz||j>=Grid.ySz)
+      return;
+    i = Grid.RorL(i);
+    Grid.xNew=i;
+    Grid.yNew=j;
+    changeCursor();
+    Def.dispCursor=true;
+    restoreFrame();
+  }
+//------------------------------------------------------------------------------
+  void handleKeyPressed(KeyEvent e)
+  { Point cellLoc[];
+    if(Def.building==Def.STATE_BUILDING)
+      return;
+    if(e.isAltDown())
+      return;
+    switch(e.getKeyCode())
+    { case KeyEvent.VK_UP:    if(Grid.yCur>0)           Grid.yNew--;        break;
+      case KeyEvent.VK_DOWN:  if(Grid.yCur<Grid.ySz-1)  Grid.yNew++;        break;
+      case KeyEvent.VK_LEFT:  if((DictionaryMtce.dicHeader[DictionaryMtce.R2L_WORD] == 1))
+                              { if(Grid.xCur<Grid.xSz-1)Grid.xNew++;        break;}
+                              else
+                              { if(Grid.xCur>0)         Grid.xNew--;        break;}
+      case KeyEvent.VK_RIGHT: if((DictionaryMtce.dicHeader[DictionaryMtce.R2L_WORD] == 1))
+                              { if(Grid.xCur>0)         Grid.xNew--;        break;}
+                              else
+                              {if(Grid.xCur<Grid.xSz-1) Grid.xNew++;        break;}
+      case KeyEvent.VK_HOME:  if((DictionaryMtce.dicHeader[DictionaryMtce.R2L_WORD] == 1))
+                              { Grid.xNew=Grid.xSz-1; break;}
+                              else
+                              { Grid.xNew=0;          break;}
+      case KeyEvent.VK_END:   if((DictionaryMtce.dicHeader[DictionaryMtce.R2L_WORD] == 1))
+                              { Grid.xNew=0;          break;}
+                              else
+                              { Grid.xNew=Grid.xSz-1; break;}
+      case KeyEvent.VK_PAGE_UP:                        Grid.yNew=0;          break;
+      case KeyEvent.VK_PAGE_DOWN:                      Grid.yNew=Grid.ySz-1; break;
+      case KeyEvent.VK_DELETE:
+      case KeyEvent.VK_BACK_SPACE:
+      case KeyEvent.VK_SPACE:                          Grid.letter[Grid.xCur][Grid.yCur]=0; break;
+      case KeyEvent.VK_ENTER: break;
+      default:
+        if(!Character.isLetter(e.getKeyChar()))
+          return;
+        if(Grid.mode[Grid.xCur][Grid.yCur]!=Def.CELL_ACTIVE&&(Grid.mode[Grid.xCur][Grid.yCur]<Def.CELL_WALL||Grid.mode[Grid.xCur][Grid.yCur]>Def.CELL_CORNER))
+          return;
+        Grid.letter[Grid.xCur][Grid.yCur]=Character.toUpperCase(e.getKeyChar());
+        cellLoc=NodeList.nodeList[Grid.nCur].cellLoc;
+        for(int i=0; i<NodeList.nodeList[Grid.nCur].length; i++)
+        { if(cellLoc[i].x==Grid.xCur&&cellLoc[i].y==Grid.yCur)
+          { if(i<NodeList.nodeList[Grid.nCur].length-1)
+            { Grid.xNew=cellLoc[i+1].x;
+              Grid.yNew=cellLoc[i+1].y;
+              break;
+            }
+          }
+        }
+        break;
+    }
+    if(e.getKeyCode() != KeyEvent.VK_DELETE && e.getKeyCode() != KeyEvent.VK_BACK_SPACE && e.getKeyCode() != KeyEvent.VK_SPACE)
+      changeCursor();
+    restoreFrame();
+  }
+}
+//------------------------------------------------------------------------------
+class DevanagariPP extends JPanel
+{ DevanagariPP(int x, int y, JFrame jf)
+  { setOpaque(true);
+    setBackground(Def.COLOR_FRAMEBG);
+    setLocation(x, y);
+    jf.add(this);
+  }
+
+  @Override public void paintComponent(Graphics g)
+  { super.paintComponent(g);
+    DevanagariBuild.setSizesAndOffsets(0, 0, DevanagariBuild.panelW, DevanagariBuild.panelH, 20, false);
+    DevanagariBuild.drawDevanagari((Graphics2D) g);
+  }
+}

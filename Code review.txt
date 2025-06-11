@@ -1,0 +1,5 @@
+Word Tools
+    Find Matching Words     [ ]
+    Find Anagrams           [ ]
+    Find Contained Words    [ ]
+    Find Container Words    [ ]
